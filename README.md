@@ -44,7 +44,7 @@ sudo dnf install -y iproute-tc
 ```
 **Allow firewall rules for k8s**\
 For seamless communication between the Master and worker node, you need to configure the firewall and allow some pertinent ports and services as outlined below.\
-On Master node, allow following ports:
+On Master node, allow the following ports:
 ```bash
 sudo firewall-cmd --permanent --add-port=6443/tcp
 sudo firewall-cmd --permanent --add-port=2379-2380/tcp
@@ -53,7 +53,7 @@ sudo firewall-cmd --permanent --add-port=10251/tcp
 sudo firewall-cmd --permanent --add-port=10252/tcp
 sudo firewall-cmd --reload
 ```
-On Worker node, allow following ports:
+On Worker node, allow the following ports:
 ```bash
 sudo firewall-cmd --permanent --add-port=10250/tcp
 sudo firewall-cmd --permanent --add-port=30000-32767/tcp                                                 
