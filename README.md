@@ -19,14 +19,14 @@ k8s-wrk-01   IP address: 192.168.178.21
 Kubernetes requires swap to be disabled for stability:
 ```bash
 sudo swapoff -a
-sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab  # Permanent disable [3][8]
+sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab  # Permanent disable
 ```
 
 **Configure SELinux**  
 Set SELinux to permissive mode:
 ```bash
 sudo sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
-sudo setenforce 0  # Immediate effect [3][4]
+sudo setenforce 0  # Immediate effect
 ```
 
 **Configure networking in master and worker node**\
@@ -77,7 +77,7 @@ net.ipv4.ip_forward = 1
 net.bridge.bridge-nf-call-ip6tables = 1
 EOF
 
-sudo sysctl --system  # Apply changes [3][4]
+sudo sysctl --system  # Apply changes
 ```
 
 ---
