@@ -23,6 +23,37 @@ sudo sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
 sudo setenforce 0  # Immediate effect [3][4]
 ```
 
+**Configure networking in master and worker node**
+Some additional network configuration is required for your master and worker nodes to communicate effectively. 
+On each node, edit the /etc/hosts file and add the following lines:
+```bash
+sudo vi /etc/hosts
+192.168.178.20 k8s-cp-01
+192.168.178.21 k8s-wrk-01
+```
+Save and exit the configuration file.
+Next, install the traffic control utility package:
+```bash
+sudo dnf install -y iproute-tc
+```
+**Allow firewall rules for k8s**
+For seamless communication between the Master and worker node, you need to configure the firewall and allow some pertinent ports and services as outlined below.
+On Master node, allow following ports:
+```bash
+sudo firewall-cmd --permanent --add-port=6443/tcp
+sudo firewall-cmd --permanent --add-port=2379-2380/tcp
+sudo firewall-cmd --permanent --add-port=10250/tcp
+sudo firewall-cmd --permanent --add-port=10251/tcp
+sudo firewall-cmd --permanent --add-port=10252/tcp
+sudo firewall-cmd --reload
+```
+On Worker node, allow following ports:
+```bash
+sudo firewall-cmd --permanent --add-port=10250/tcp
+sudo firewall-cmd --permanent --add-port=30000-32767/tcp                                                 
+sudo firewall-cmd --reload
+```
+
 **Network Configuration**  
 Enable kernel modules and IP forwarding:
 ```bash
@@ -46,10 +77,13 @@ sudo sysctl --system  # Apply changes [3][4]
 ---
 
 ## 2. Container Runtime Installation
-**Option A: CRI-O (Recommended)**  
+To install CRI-O, set the $CRIO_VERSION environment variable to match your CRI-O version. 
+For instance, to install CRI-O version 1.30 set the $CRIO_VERSION as shown:
+
 For Kubernetes 1.23+:
 ```bash
 export CRIO_VERSION=v1.30
+
 cat <<EOF | sudo tee /etc/yum.repos.d/cri-o.repo
 [cri-o]
 name=CRI-O
@@ -60,16 +94,10 @@ gpgkey=https://pkgs.k8s.io/addons:/cri-o:/stable:/$CRIO_VERSION/rpm/repodata/rep
 EOF
 
 sudo dnf install -y cri-o
-sudo systemctl enable --now crio [3][4]
-```
 
-**Option B: Docker**  
-For legacy support:
-```bash
-sudo dnf install -y docker
-sudo systemctl enable --now docker
+sudo systemctl enable crio
+sudo systemctl start crio
 ```
-
 ---
 
 ## 3. Kubernetes Components Installation
@@ -85,36 +113,61 @@ gpgcheck=1
 gpgkey=https://pkgs.k8s.io/core:/stable:/$KUBERNETES_VERSION/rpm/repodata/repomd.xml.key
 EOF
 
-sudo dnf install -y kubelet kubeadm kubectl --disableexcludes=kubernetes
-sudo systemctl enable --now kubelet [2][3][8]
+sudo dnf install kubelet kubeadm kubectl -y
+
+sudo systemctl enable kubelet
+sudo systemctl start kubelet
+
 ```
 
 ---
 
 ## 4. Master Node Initialization
 ```bash
-sudo kubeadm init --pod-network-cidr=192.168.10.0/16  # Or 10.244.0.0/16 for Flannel
+sudo kubeadm init --pod-network-cidr=192.168.10.0/16
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
 sudo chown $(id -u):$(id -g) $HOME/.kube/config [3][6][8]
 ```
+At the very end of the output, you will be given the command to run on worker nodes to join the cluster. We will come to that later in the next step.
+Also, be sure to remove taints from the master node:
+```bash
+kubectl taint nodes --all node-role.kubernetes.io/master-
+```
 
 **Install Network Plugin**  
-For Calico:
+After Installing Calico CNI, nodes state will change to Ready state, DNS service inside the cluster would be functional and containers can start communicating with each other.
+Calico provides scalability, high performance, and interoperability with existing Kubernetes workloads. It can be deployed on-premises and on popular cloud technologies such as Google Cloud, AWS and Azure.
+To install Calico CNI, run the following command from the master node:
 ```bash
-kubectl apply -f https://projectcalico.docs.tigera.io/manifests/calico.yaml
+kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.28.0/manifests/calico.yaml
 ```
-For Flannel:
+To confirm if the pods have started, run the command:
 ```bash
-kubectl apply -f https://github.com/flannel-io/flannel/releases/latest/download/kube-flannel.yml [4][8]
+kubectl get pods -n kube-system
 ```
-
+You should see that each pod is ‘READY’ and has the ‘RUNNING’ status as shown in the third column.
+To verify the master node’s availability in the cluster, run the command:
+```bash
+kubectl get nodes
+NAME           STATUS   ROLES            AGE    VERSION
+k8s-cp-01      Ready    control-plane    9m56s  v1.30.4
+```
+In addition, you can retrieve more information using the -o wide options:
+```bash
+kubectl get nodes -o wide
+```
+The above output confirms that the master node is ready. 
+Additionally, you can check the pod namespaces:
+```bash
+kubectl get pods --all-namespaces
+```
 ---
 
 ## 5. Worker Node Joining
 Use the join command generated during master initialization:
 ```bash
-sudo kubeadm join <MASTER_IP>:6443 --token <TOKEN> --discovery-token-ca-cert-hash sha256:<HASH> [3][4]
+sudo kubeadm join <MASTER_IP>:6443 --token <TOKEN> --discovery-token-ca-cert-hash sha256:<HASH> 
 ```
 
 ---
@@ -123,20 +176,19 @@ sudo kubeadm join <MASTER_IP>:6443 --token <TOKEN> --discovery-token-ca-cert-has
 **Check Cluster Status**  
 On master node:
 ```bash
-kubectl get nodes  # Should show all nodes as 'Ready' [3][6]
+kubectl get nodes  # Should show all nodes as 'Ready' 
 ```
 
 **Test Deployment**  
 Create sample Nginx deployment:
 ```bash
 kubectl create deployment nginx --image=nginx
-kubectl expose deployment nginx --port=80 --type=NodePort [6]
+kubectl expose deployment nginx --port=80 --type=NodePort
 ```
 
 ---
 
 **Key Considerations**:
-- Use consistent Kubernetes versions across all nodes[6]
+- Use consistent Kubernetes versions across all nodes
 - Ensure time synchronization (chrony/NTP) between nodes
-- For production, consider etcd backups and high availability[7]
-- Recent versions may require containerd instead of Docker[9]
+- For production, consider etcd backups and high availability
