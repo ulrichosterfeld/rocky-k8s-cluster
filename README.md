@@ -12,7 +12,7 @@ We use the following nodes in our example:\
 Control plane:\
 k8s-cp-01    IP address: 192.168.178.20\
 Worker node:\
-k8s-wrk-01   IP address: 192.168.178.21
+k8s-wrk-01    IP address: 192.168.178.21
 
 ## 1. System Preparation (Both Nodes)
 **Disable Swap**  
