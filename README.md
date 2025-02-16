@@ -1,12 +1,18 @@
 # rocky-k8s-cluster
-Installing a Kubernetes cluster on RHEL 8 involves preparing nodes, configuring container runtimes, and initializing the control plane. Here's a consolidated guide based on best practices from multiple sources:
+Installing a Kubernetes cluster on Rocky Linux 9.5 involves preparing nodes, configuring container runtimes, and initializing the control plane. 
+Here's a guide based on best practices:
 
 ## Prerequisites
-- **Nodes**: At least two RHEL 8 systems (1 master, 1+ workers) with static IPs
+- **Nodes**: At least two Rocky Linux systems (1 master, 1+ workers) with static IPs
 - **Resources**: 2+ GB RAM and 2+ CPUs per node
 - **Network**: Disable firewalls or allow Kubernetes ports (6443, 10250, etc.)
-
 ---
+
+We use the following nodes in our example:\
+Control plane:\
+k8s-cp-01    IP address: 192.168.178.20\
+Worker node:\
+k8s-wrk-01   IP address: 192.168.178.21
 
 ## 1. System Preparation (Both Nodes)
 **Disable Swap**  
@@ -23,8 +29,8 @@ sudo sed -i 's/^SELINUX=enforcing$/SELINUX=permissive/' /etc/selinux/config
 sudo setenforce 0  # Immediate effect [3][4]
 ```
 
-**Configure networking in master and worker node**
-Some additional network configuration is required for your master and worker nodes to communicate effectively. 
+**Configure networking in master and worker node**\
+Some additional network configuration is required for your master and worker nodes to communicate effectively.\
 On each node, edit the /etc/hosts file and add the following lines:
 ```bash
 sudo vi /etc/hosts
@@ -36,8 +42,8 @@ Next, install the traffic control utility package:
 ```bash
 sudo dnf install -y iproute-tc
 ```
-**Allow firewall rules for k8s**
-For seamless communication between the Master and worker node, you need to configure the firewall and allow some pertinent ports and services as outlined below.
+**Allow firewall rules for k8s**\
+For seamless communication between the Master and worker node, you need to configure the firewall and allow some pertinent ports and services as outlined below.\
 On Master node, allow following ports:
 ```bash
 sudo firewall-cmd --permanent --add-port=6443/tcp
@@ -77,9 +83,6 @@ sudo sysctl --system  # Apply changes [3][4]
 ---
 
 ## 2. Container Runtime Installation
-To install CRI-O, set the $CRIO_VERSION environment variable to match your CRI-O version. 
-For instance, to install CRI-O version 1.30 set the $CRIO_VERSION as shown:
-
 For Kubernetes 1.23+:
 ```bash
 export CRIO_VERSION=v1.30
@@ -127,7 +130,7 @@ sudo systemctl start kubelet
 sudo kubeadm init --pod-network-cidr=192.168.10.0/16
 mkdir -p $HOME/.kube
 sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
-sudo chown $(id -u):$(id -g) $HOME/.kube/config [3][6][8]
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
 ```
 At the very end of the output, you will be given the command to run on worker nodes to join the cluster. We will come to that later in the next step.
 Also, be sure to remove taints from the master node:
